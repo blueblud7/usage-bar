@@ -26,6 +26,7 @@ let strings: [String: [String: String]] = [
                 "ja": "Claude のログインが期限切れです。Claude Code を一度実行すると復帰します。", "zh": "Claude 登录已过期。运行一次 Claude Code 即可恢复。"],
     "resets":  ["en": "Resets in %@", "ko": "리셋 %@ 후", "ja": "リセットまで %@", "zh": "%@后重置"],
     "left":    ["en": "left", "ko": "남음", "ja": "残り", "zh": "剩余"],
+    "widget":  ["en": "Show floating widget", "ko": "플로팅 위젯 표시", "ja": "フロートウィジェットを表示", "zh": "显示悬浮小组件"],
     "refresh": ["en": "Refresh", "ko": "새로고침", "ja": "更新", "zh": "刷新"],
     "login":   ["en": "Launch at login", "ko": "로그인 시 자동 실행", "ja": "ログイン時に起動", "zh": "登录时启动"],
     "quit":    ["en": "Quit", "ko": "종료", "ja": "終了", "zh": "退出"],
@@ -212,22 +213,50 @@ struct VisualEffect: NSViewRepresentable {
 
 final class App: NSObject, NSApplicationDelegate {
     let model = Model(); var panel: NSPanel!; var host: NSHostingView<Widget>!
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    var showWidget: Bool { get { UserDefaults.standard.object(forKey: "showWidget") as? Bool ?? true } set { UserDefaults.standard.set(newValue, forKey: "showWidget") } }
     func applicationDidFinishLaunching(_ n: Notification) {
         host = NSHostingView(rootView: Widget(m: model))
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 200, height: 150), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.contentView = host; panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
         panel.level = .floating; panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        let menu = NSMenu(); menu.addItem(withTitle: L("refresh"), action: #selector(doRefresh), keyEquivalent: "r").target = self
-        let li = menu.addItem(withTitle: L("login"), action: #selector(toggleLogin(_:)), keyEquivalent: ""); li.target = self
-        li.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(withTitle: L("quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        host.menu = menu
+        host.menu = buildMenu(); item.menu = buildMenu(); item.button?.title = "…"
         if let f = UserDefaults.standard.string(forKey: "pos") { panel.setFrameOrigin(NSPointFromString(f)) } else { place() }
         NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { _ in
             UserDefaults.standard.set(NSStringFromPoint(self.panel.frame.origin), forKey: "pos") }
-        panel.orderFrontRegardless()
+        if showWidget { panel.orderFrontRegardless() }
         refresh(); Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in self.refresh() }
+    }
+    func buildMenu() -> NSMenu {
+        let menu = NSMenu()
+        for t in model.tools where t.ok {
+            let h = NSMenuItem(title: t.name, action: nil, keyEquivalent: ""); h.isEnabled = false
+            h.attributedTitle = NSAttributedString(string: t.name, attributes: [.font: NSFont.boldSystemFont(ofSize: 13)]); menu.addItem(h)
+            for w in t.wins {
+                let r = LS("resets", remain(w.resets, now: model.now)); let at = absTime(w.resets)
+                let m = NSMenuItem(title: "  \(w.label) · \(Int((100 - w.used).rounded()))% \(L("left")) · \(r) (\(at))", action: nil, keyEquivalent: "")
+                m.isEnabled = false; menu.addItem(m)
+            }
+            menu.addItem(.separator())
+        }
+        if !model.note.isEmpty { let n = NSMenuItem(title: model.note, action: nil, keyEquivalent: ""); n.isEnabled = false; menu.addItem(n); menu.addItem(.separator()) }
+        let w = menu.addItem(withTitle: L("widget"), action: #selector(toggleWidget(_:)), keyEquivalent: ""); w.target = self; w.state = showWidget ? .on : .off
+        menu.addItem(withTitle: L("refresh"), action: #selector(doRefresh), keyEquivalent: "r").target = self
+        let li = menu.addItem(withTitle: L("login"), action: #selector(toggleLogin(_:)), keyEquivalent: ""); li.target = self
+        li.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        menu.addItem(withTitle: L("quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        return menu
+    }
+    func updateBar() {
+        let parts = model.tools.filter { $0.ok }.compactMap { t in t.left.map { "\(t.id == "claude" ? "Cl" : "Cx") \(Int($0.rounded()))%" } }
+        item.button?.title = parts.isEmpty ? "–" : parts.joined(separator: " · ")
+        item.menu = buildMenu(); host.menu = buildMenu()
+    }
+    @objc func toggleWidget(_ i: NSMenuItem) {
+        showWidget.toggle()
+        if showWidget { panel.orderFrontRegardless() } else { panel.orderOut(nil) }
+        updateBar()
     }
     func place() {
         guard let v = NSScreen.main?.visibleFrame else { return }
@@ -238,7 +267,7 @@ final class App: NSObject, NSApplicationDelegate {
         DispatchQueue.global().async {
             let (now, tools) = fetch()
             DispatchQueue.main.async {
-                self.model.now = now; self.model.tools = tools; self.model.note = claudeNote
+                self.model.now = now; self.model.tools = tools; self.model.note = claudeNote; self.updateBar()
                 DispatchQueue.main.async {
                     let top = self.panel.frame.maxY, right = self.panel.frame.maxX, sz = self.host.fittingSize
                     self.panel.setFrame(NSRect(x: right - sz.width, y: top - sz.height, width: sz.width, height: sz.height), display: true)

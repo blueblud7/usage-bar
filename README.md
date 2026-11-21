@@ -17,7 +17,12 @@ curl -fsSL https://raw.githubusercontent.com/blueblud7/usage-bar/main/install.sh
 
 Or download `UsageBar.zip` from [Releases](../../releases), unzip it, move `UsageBar.app` to Applications, then **right-click → Open** the first time (the app isn't notarized by Apple, so a double-click shows a warning).
 
-A widget appears at the top right of your screen. Drag it anywhere. Right-click it to refresh, launch at login, or quit.
+You get two views of the same data:
+
+- **Menu bar**: a short text like `Cl 75% · Cx 91%`. Click it for details (remaining %, time until reset, exact reset time).
+- **Floating widget**: ring gauges at the top right of your screen. Drag it anywhere. Right-click it (or use the menu bar item) to refresh, toggle the widget, launch at login, or quit.
+
+> **Notch Macs:** if your menu bar is crowded, macOS hides the overflow items behind the notch. The floating widget always stays visible. You can also free up space by hiding icons with a menu bar manager such as [Ice](https://github.com/jordanbaird/Ice).
 
 Requires macOS 13+ (Apple Silicon and Intel).
 
