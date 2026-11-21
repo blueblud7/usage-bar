@@ -5,7 +5,7 @@ A tiny floating widget for macOS that shows how much **Claude Code** and **Codex
 Each ring shows the remaining %, how long until the limit resets, and the exact reset time.
 Rings turn green → orange → red as you run low. Tools with no data are hidden.
 
-[简体中文 / 日本語 / 한국어: the app follows your system language. 한국어 README: README.ko.md](README.ko.md)
+Also available in Korean: [README.ko.md](README.ko.md). The app itself follows your system language (English, Korean, Japanese, Chinese).
 
 ## Install
 
